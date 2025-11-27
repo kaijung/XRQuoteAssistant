@@ -1,0 +1,7 @@
+{
+  "name": "XR Quote Assistant",
+  "description": "A voice-enabled AI assistant powered by Gemini Live API to discuss and gather requirements for XR (VR/AR) project quotations.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
