@@ -2,7 +2,7 @@
 
 ## 1. Project Summary
 
-The project, 'XR Quote Assistant', is a sophisticated, real-time, voice-based conversational AI application. It is built using React, TypeScript, and Vite. Its primary purpose is to act as an AI-powered consultant ('Mew') for a fictional XR studio. The AI's goal is to engage potential clients in a spoken conversation to gather requirements for their projects (e.g., VR/AR type, platform, budget) in order to prepare a price quote.
+The project, 'XR Quote Assistant', is a sophisticated, real-time, voice-based conversational AI application. It is built using React, TypeScript, and Vite. Its primary purpose is to act as an AI-powered consultant ('Mew') for "Arplanet Digital Technology Co.,Ltd.". The AI's goal is to engage potential clients in a spoken conversation to gather requirements for their projects (e.g., VR/AR type, platform, budget) in order to prepare a price quote.
 
 The core of the application is the `useLiveAPI` custom hook, which masterfully handles a real-time, bidirectional audio stream with the Google Gemini Live API (`gemini-2.5-flash-native-audio-preview-09-2025` model). It captures microphone audio, sends it to the API, receives audio and transcription in return, and plays the AI's voice back to the user. The application's front-end displays the conversation in a chat format and provides a dynamic visualization of the AI's voice.
 
@@ -54,7 +54,7 @@ The analysis process involved the following steps:
 
 ## 1. 專案摘要
 
-「XR 報價助理」專案是一款精密的即時語音對話式 AI 應用程式。它使用 React、TypeScript 和 Vite 技術棧建構。其主要目的是為一家虛構的 XR 工作室扮演名為「Mew」的 AI 顧問。此 AI 的目標是透過與潛在客戶進行語音對話，收集他們專案的需求（例如：VR/AR 類型、平台、預算），以便準備報價。
+「XR 報價助理」專案是一款精密的即時語音對話式 AI 應用程式。它使用 React、TypeScript 和 Vite 技術棧建構。其主要目的是為「Arplanet Digital Technology Co.,Ltd.」扮演名為「Mew」的 AI 顧問。此 AI 的目標是透過與潛在客戶進行語音對話，收集他們專案的需求（例如：VR/AR 類型、平台、預算），以便準備報價。
 
 此應用的核心是 `useLiveAPI` 自定義鉤子 (custom hook)，它巧妙地處理了與 Google Gemini Live API (`gemini-2.5-flash-native-audio-preview-09-2025` 模型) 的即時雙向音訊串流。它能擷取麥克風音訊，將其傳送至 API，接收回傳的音訊和逐字稿，並向使用者播放 AI 的語音。應用的前端以聊天格式顯示對話內容，並提供 AI 語音的動態視覺化效果。
 
