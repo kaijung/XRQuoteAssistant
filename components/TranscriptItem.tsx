@@ -19,7 +19,7 @@ export const TranscriptItem: React.FC<TranscriptItemProps> = ({ item }) => {
       >
         <div className="flex items-center gap-2 mb-1">
           <span className={`text-xs font-bold uppercase tracking-wider ${isUser ? 'text-indigo-400' : 'text-cyan-400'}`}>
-            {isUser ? 'You' : 'Nova (AI)'}
+            {isUser ? 'You' : 'Mew (AI)'}
           </span>
           <span className="text-xs text-slate-500">
             {item.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}

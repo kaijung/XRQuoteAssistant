@@ -7,7 +7,7 @@ interface AudioVisualizerProps {
 
 export const AudioVisualizer: React.FC<AudioVisualizerProps> = ({ analyser, isConnected }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationRef = useRef<number>();
+  const animationRef = useRef<number>(0);
 
   useEffect(() => {
     const canvas = canvasRef.current;

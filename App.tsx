@@ -140,7 +140,7 @@ export default function App() {
                     </svg>
                   </div>
                   <p className="text-sm text-center max-w-xs">
-                    Start a session to discuss your XR project with Nova.
+                    Start a session to discuss your XR project with Mew.
                   </p>
                 </div>
               ) : (

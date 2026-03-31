@@ -1,6 +1,9 @@
-import { Blob } from '@google/genai';
+export type PCMChunk = {
+  data: string;
+  mimeType: string;
+};
 
-export function createBlob(data: Float32Array): Blob {
+export function createBlob(data: Float32Array, sampleRate: number = 16000): PCMChunk {
   const l = data.length;
   const int16 = new Int16Array(l);
   for (let i = 0; i < l; i++) {
@@ -10,7 +13,7 @@ export function createBlob(data: Float32Array): Blob {
   }
   return {
     data: encode(new Uint8Array(int16.buffer)),
-    mimeType: 'audio/pcm;rate=16000',
+    mimeType: `audio/pcm;rate=${sampleRate}`,
   };
 }
 

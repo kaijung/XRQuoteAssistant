@@ -16,7 +16,6 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
   // Audio Contexts and Nodes
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
-  const inputNodeRef = useRef<GainNode | null>(null);
   const outputNodeRef = useRef<GainNode | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -35,6 +34,7 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
 
   const disconnect = useCallback(async () => {
     setIsConnected(false);
+    setIsConnecting(false);
     
     // Stop all audio sources
     if (sourcesRef.current) {
@@ -50,11 +50,19 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
 
     // Close Audio Contexts
     if (inputAudioContextRef.current) {
-      await inputAudioContextRef.current.close();
+      try {
+        await inputAudioContextRef.current.close();
+      } catch (e) {
+        // ignore
+      }
       inputAudioContextRef.current = null;
     }
     if (outputAudioContextRef.current) {
-      await outputAudioContextRef.current.close();
+      try {
+        await outputAudioContextRef.current.close();
+      } catch (e) {
+        // ignore
+      }
       outputAudioContextRef.current = null;
     }
 
@@ -67,12 +75,22 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
     // Close Session
     if (sessionPromiseRef.current) {
       sessionPromiseRef.current.then(session => {
-        session.close();
+        try {
+          session.close();
+        } catch(e) {
+           console.warn("Error closing session", e);
+        }
+      }).catch(() => {
+        // Ignore errors during closing if session wasn't fully established
       });
       sessionPromiseRef.current = null;
     }
+    
+    // Reset state
+    nextStartTimeRef.current = 0;
+    currentInputTranscriptionRef.current = '';
+    currentOutputTranscriptionRef.current = '';
 
-    setIsConnecting(false);
   }, []);
 
   const connect = useCallback(async () => {
@@ -91,8 +109,31 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
 
       // Initialize Audio Contexts
       const InputContextClass = (window.AudioContext || (window as any).webkitAudioContext);
-      const inputAudioContext = new InputContextClass({ sampleRate: 16000 });
-      const outputAudioContext = new InputContextClass({ sampleRate: 24000 });
+      
+      let inputAudioContext: AudioContext;
+      let outputAudioContext: AudioContext;
+
+      try {
+        inputAudioContext = new InputContextClass({ sampleRate: 16000 });
+      } catch (e) {
+        console.warn("Could not create AudioContext with sampleRate 16000, falling back to default", e);
+        inputAudioContext = new InputContextClass();
+      }
+
+      try {
+         outputAudioContext = new InputContextClass({ sampleRate: 24000 });
+      } catch (e) {
+         console.warn("Could not create AudioContext with sampleRate 24000, falling back to default", e);
+         outputAudioContext = new InputContextClass();
+      }
+
+      // Explicitly resume contexts to ensure they are active (browsers often suspend them)
+      if (inputAudioContext.state === 'suspended') {
+        await inputAudioContext.resume();
+      }
+      if (outputAudioContext.state === 'suspended') {
+        await outputAudioContext.resume();
+      }
 
       inputAudioContextRef.current = inputAudioContext;
       outputAudioContextRef.current = outputAudioContext;
@@ -112,17 +153,20 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
       streamRef.current = stream;
 
       // Setup Session
+      // Use Modality.AUDIO
+      const config = {
+        responseModalities: [Modality.AUDIO], 
+        speechConfig: {
+          voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+        },
+        systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+        inputAudioTranscription: {}, 
+        outputAudioTranscription: {}, 
+      };
+
       const sessionPromise = ai.live.connect({
         model: MODEL_NAME,
-        config: {
-          responseModalities: [Modality.AUDIO],
-          speechConfig: {
-            voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
-          },
-          systemInstruction: SYSTEM_INSTRUCTION,
-          inputAudioTranscription: {},
-          outputAudioTranscription: {},
-        },
+        config: config,
         callbacks: {
           onopen: () => {
             console.log('Session opened');
@@ -136,25 +180,32 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
 
             scriptProcessor.onaudioprocess = (audioProcessingEvent) => {
               const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-              const pcmBlob = createBlob(inputData);
+              // Pass the actual sample rate from the context to ensure MIME type matches data
+              const pcmBlob = createBlob(inputData, inputAudioContext.sampleRate);
               
               // Send audio chunk to session
               sessionPromise.then((session) => {
                 session.sendRealtimeInput({ media: pcmBlob });
+              }).catch(e => {
+                  console.error("Failed to send audio", e);
               });
             };
 
             source.connect(scriptProcessor);
-            scriptProcessor.connect(inputAudioContext.destination);
+            // Connect to a silent gain node instead of destination to prevent audio feedback
+            const silence = inputAudioContext.createGain();
+            silence.gain.value = 0;
+            scriptProcessor.connect(silence);
+            silence.connect(inputAudioContext.destination);
           },
           onmessage: async (message: LiveServerMessage) => {
             // Handle Transcriptions
             if (message.serverContent?.outputTranscription) {
               const text = message.serverContent.outputTranscription.text;
-              currentOutputTranscriptionRef.current += text;
+              if (text) currentOutputTranscriptionRef.current += text;
             } else if (message.serverContent?.inputTranscription) {
               const text = message.serverContent.inputTranscription.text;
-              currentInputTranscriptionRef.current += text;
+              if (text) currentInputTranscriptionRef.current += text;
             }
 
             if (message.serverContent?.turnComplete) {
@@ -215,7 +266,9 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
             if (message.serverContent?.interrupted) {
               console.log('Interrupted');
               sourcesRef.current.forEach(source => {
-                source.stop();
+                try {
+                  source.stop();
+                } catch(e) {} // ignore if already stopped
                 sourcesRef.current.delete(source);
               });
               nextStartTimeRef.current = 0;
@@ -224,14 +277,24 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
           },
           onclose: () => {
             console.log('Session closed');
-            disconnect();
+            setIsConnected(false);
+            setIsConnecting(false);
           },
           onerror: (err) => {
             console.error('Session error', err);
-            setError(err instanceof Error ? err.message : 'Unknown error');
-            disconnect();
+            setError(err instanceof Error ? err.message : 'Session Error detected');
+            setIsConnected(false);
+            setIsConnecting(false);
           }
         }
+      });
+
+      // Catch initial connection errors (e.g. 4xx/5xx from handshake)
+      sessionPromise.catch(err => {
+         console.error("Connection handshake failed", err);
+         setError(err.message || "Connection failed");
+         setIsConnecting(false);
+         setIsConnected(false);
       });
 
       sessionPromiseRef.current = sessionPromise;
@@ -242,7 +305,7 @@ export const useLiveAPI = ({ onTranscriptUpdate }: UseLiveAPIOptions) => {
       setIsConnecting(false);
       setIsConnected(false);
     }
-  }, [disconnect, isConnecting, isConnected, onTranscriptUpdate]);
+  }, [isConnecting, isConnected, onTranscriptUpdate]);
 
   return {
     connect,
